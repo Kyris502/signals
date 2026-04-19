@@ -32,7 +32,7 @@ function sendPush(title, body) {
 
 function fetchCandles(symbol) {
   return new Promise(function(resolve, reject) {
-    var url = "https://api.binance.com/api/v3/klines?symbol=" + symbol + "&interval=" + TIMEFRAME + "&limit=80";
+    var url = "https://data-api.binance.vision/api/v3/klines?symbol=" + symbol + "&interval=" + TIMEFRAME + "&limit=80";
     https.get(url, function(res) {
       var data = "";
       res.on("data", function(c) { data += c; });
@@ -119,7 +119,7 @@ function detectBOS(c) {
     if (c[i].l < c[i-1].l && c[i].l < c[i+1].l) lo.push({ val: c[i].l });
   }
   for (var j = 1; j < hi.length; j++) if (hi[j].val > hi[j-1].val) s.push({ dir: "BULLISH" });
-  for (var k = 1; k < lo.length; k++) if (lo[k].val < lo[k-1].val) s.push({ dir: "BEARISH" });
+  for (var k2 = 1; k2 < lo.length; k2++) if (lo[k2].val < lo[k2-1].val) s.push({ dir: "BEARISH" });
   return s.slice(-3);
 }
 
@@ -154,7 +154,7 @@ function getNewsFilter() {
   return { safe: true };
 }
 
-function analyze(candles, dec) {
+function analyze(candles) {
   if (candles.length < 26) return null;
   var rsi = calcRSI(candles);
   var macd = calcMACD(candles);
@@ -257,7 +257,7 @@ function checkNextPair() {
   var now = Date.now();
 
   fetchCandles(pair.sym).then(function(candles) {
-    var sig = analyze(candles, pair.dec);
+    var sig = analyze(candles);
     if (sig && sig.dir !== "HOLD") {
       var key = pair.sym + "_" + sig.dir;
       var lastSig = lastSignals[key] || 0;
@@ -293,9 +293,10 @@ http.createServer(function(req, res) {
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ status: "running", uptime: Math.round(process.uptime()), stats: stats }, null, 2));
 }).listen(PORT, function() {
-  console.log("=== SIGNAL SERVER v2 ===");
+  console.log("=== SIGNAL SERVER v3 ===");
   console.log("Port: " + PORT);
+  console.log("API: data-api.binance.vision");
   console.log("========================");
-  sendPush("Signal Server Started", "Monitoring " + PAIRS.length + " pairs").catch(function() {});
+  sendPush("Signal Server Started", "Monitoring " + PAIRS.length + " pairs 24/7").catch(function() {});
   setInterval(checkNextPair, 3000);
 });
