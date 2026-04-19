@@ -1,4 +1,5 @@
-const http = require(‘http’);
+const http = require('http');
+ http = require(‘http’);
 const https = require(‘https’);
 
 const PUSH_TOKEN = ‘ExponentPushToken[2_TkioJHlKTlrewxCpA9jR]’;
