@@ -90,40 +90,34 @@ return h === l ? 50 : Math.round((d[d.length - 1].c - l) / (h - l) * 100);
 function detectBOS(c) {
 if (c.length < 20) return [];
 var s = [], hi = [], lo = [];
-for (var i = 2; i < c.length - 1; i++) { if (c[i].h > c[i-1].h && c[i].h > c[i+1].h) hi.push({ val: c[i].h }); if (c[i].l < c[i-1].l && c[i].l < c[i+1].l) lo.push({ val: c[i].l }); }
-for (var j = 1; j < hi.length; j++) if (hi[j].val > hi[j-1].val) s.push({ dir: “BULLISH” });
-for (var k2 = 1; k2 < lo.length; k2++) if (lo[k2].val < lo[k2-1].val) s.push({ dir: “BEARISH” });
+for (var i = 2; i < c.length - 1; i++) { if (c[i].h > c[i-1].h && c[i].h > c[i+1].h) hi.push(c[i].h); if (c[i].l < c[i-1].l && c[i].l < c[i+1].l) lo.push(c[i].l); }
+for (var j = 1; j < hi.length; j++) if (hi[j] > hi[j-1]) s.push(“BULLISH”);
+for (var k2 = 1; k2 < lo.length; k2++) if (lo[k2] < lo[k2-1]) s.push(“BEARISH”);
 return s.slice(-3);
 }
 
 function detectFVG(c) {
 if (c.length < 5) return [];
 var g = [];
-for (var i = 2; i < c.length; i++) { if (c[i].l > c[i-2].h) g.push({ dir: “BULLISH” }); if (c[i].h < c[i-2].l) g.push({ dir: “BEARISH” }); }
+for (var i = 2; i < c.length; i++) { if (c[i].l > c[i-2].h) g.push(“BULLISH”); if (c[i].h < c[i-2].l) g.push(“BEARISH”); }
 return g.slice(-3);
-}
-
-function detectSR(c) {
-if (c.length < 20) return { support: null, resistance: null };
-var r = c.slice(-20), hh = -Infinity, ll = Infinity;
-for (var i = 0; i < r.length; i++) { if (r[i].h > hh) hh = r[i].h; if (r[i].l < ll) ll = r[i].l; }
-return { resistance: hh, support: ll };
-}
-
-function getNewsFilter() {
-var h = new Date().getUTCHours(), m = new Date().getUTCMinutes();
-var hi = [{ h: 12, m: 30 }, { h: 13, m: 0 }, { h: 14, m: 0 }, { h: 14, m: 30 }, { h: 8, m: 30 }, { h: 10, m: 0 }];
-for (var i = 0; i < hi.length; i++) { var diff = (hi[i].h - h) * 60 + (hi[i].m - m); if (diff >= -5 && diff <= 15) return { safe: false }; }
-return { safe: true };
 }
 
 function analyze(candles) {
 if (candles.length < 26) return null;
-var rsi = calcRSI(candles), macd = calcMACD(candles), stoch = calcStoch(candles);
-var last = candles.length - 1, price = candles[last].c;
-var bos = detectBOS(candles), fvg = detectFVG(candles), sr = detectSR(candles), nf = getNewsFilter();
-var inds = [];
+var rsi = calcRSI(candles);
+var macd = calcMACD(candles);
+var stoch = calcStoch(candles);
+var last = candles.length - 1;
+var price = candles[last].c;
+var bos = detectBOS(candles);
+var fvg = detectFVG(candles);
+var nf = true;
+var h = new Date().getUTCHours(), m = new Date().getUTCMinutes();
+var hi = [{ h: 12, m: 30 }, { h: 13, m: 0 }, { h: 14, m: 0 }, { h: 14, m: 30 }, { h: 8, m: 30 }, { h: 10, m: 0 }];
+for (var n = 0; n < hi.length; n++) { var diff = (hi[n].h - h) * 60 + (hi[n].m - m); if (diff >= -5 && diff <= 15) nf = false; }
 
+var inds = [];
 if (rsi < 30) inds.push({ d: “BUY”, s: 90 }); else if (rsi < 40) inds.push({ d: “BUY”, s: 65 }); else if (rsi > 70) inds.push({ d: “SELL”, s: 90 }); else if (rsi > 60) inds.push({ d: “SELL”, s: 60 }); else inds.push({ d: “HOLD”, s: 50 });
 
 var mH = macd.hist[last], mHp = macd.hist[last - 1];
@@ -132,12 +126,10 @@ if (mH > 0 && mHp <= 0) inds.push({ d: “BUY”, s: 85 }); else if (mH < 0 && m
 if (stoch < 20) inds.push({ d: “BUY”, s: 80 }); else if (stoch > 80) inds.push({ d: “SELL”, s: 80 }); else inds.push({ d: “HOLD”, s: 45 });
 
 var lb = bos.length > 0 ? bos[bos.length - 1] : null;
-if (lb) inds.push({ d: lb.dir === “BULLISH” ? “BUY” : “SELL”, s: 80 }); else inds.push({ d: “HOLD”, s: 40 });
+if (lb) inds.push({ d: lb === “BULLISH” ? “BUY” : “SELL”, s: 80 }); else inds.push({ d: “HOLD”, s: 40 });
 
 var lf = fvg.length > 0 ? fvg[fvg.length - 1] : null;
-if (lf) inds.push({ d: lf.dir === “BULLISH” ? “BUY” : “SELL”, s: 75 }); else inds.push({ d: “HOLD”, s: 40 });
-
-if (sr.support && sr.resistance) { var dS = (price - sr.support) / price * 100; if (dS < 0.3) inds.push({ d: “BUY”, s: 70 }); else if ((sr.resistance - price) / price * 100 < 0.3) inds.push({ d: “SELL”, s: 70 }); else inds.push({ d: “HOLD”, s: 45 }); } else inds.push({ d: “HOLD”, s: 40 });
+if (lf) inds.push({ d: lf === “BULLISH” ? “BUY” : “SELL”, s: 75 }); else inds.push({ d: “HOLD”, s: 40 });
 
 if (candles.length > 10) { var r10 = candles.slice(-10); if (r10[r10.length-1].c > r10[0].c * 1.001) inds.push({ d: “BUY”, s: 65 }); else if (r10[r10.length-1].c < r10[0].c * 0.999) inds.push({ d: “SELL”, s: 65 }); else inds.push({ d: “HOLD”, s: 45 }); }
 
@@ -152,9 +144,9 @@ var recSec = 0;
 if (dir !== “HOLD”) { if (conf >= 90) recSec = 30; else if (conf >= 85) recSec = 60; else if (conf >= 80) recSec = 120; else if (conf >= 75) recSec = 180; else if (conf >= 70) recSec = 300; else if (conf >= 65) recSec = 600; else if (conf >= 60) recSec = 900; else recSec = 1800; }
 
 var action = “Wait”;
-if (dir !== “HOLD”) { if (!nf.safe) action = “NEWS”; else if (lb && lf && lb.dir === (dir === “BUY” ? “BULLISH” : “BEARISH”)) action = “ENTRY BOS+FVG”; else action = “Confirm”; }
+if (dir !== “HOLD”) { if (!nf) action = “NEWS”; else if (lb && lf) action = “ENTRY BOS+FVG”; else action = “Confirm”; }
 
-return { dir: dir, conf: conf, agree: agree, total: inds.length, recSec: recSec, price: price, safe: nf.safe, action: action, rsi: rsi };
+return { dir: dir, conf: conf, agree: agree, total: inds.length, recSec: recSec, price: price, safe: nf, action: action, rsi: rsi };
 }
 
 function formatDur(sec) { var mm = Math.floor(sec / 60); var ss = sec % 60; return (mm < 10 ? “0” : “”) + mm + “:” + (ss < 10 ? “0” : “”) + ss; }
@@ -169,14 +161,14 @@ if (sig && sig.dir !== “HOLD”) {
 var key = pair.sym + sig.dir;
 var ls = lastSignals[key] || 0;
 if (sig.conf >= MIN_CONFIDENCE && sig.agree >= MIN_AGREE && sig.safe && (now - lastNotifTime > COOLDOWN) && (now - ls > 300000)) {
-var t = sig.dir + “ “ + pair.label + “ “ + sig.conf + “%”;
-var b = sig.action + “ | “ + formatDur(sig.recSec) + “ | “ + sig.agree + “/” + sig.total + “ | “ + sig.price.toFixed(pair.dec);
-sendPush(t, b);
+var title = sig.dir + “ “ + pair.label + “ “ + sig.conf + “%”;
+var body = sig.action + “ | “ + formatDur(sig.recSec) + “ | “ + sig.agree + “/” + sig.total + “ | “ + sig.price.toFixed(pair.dec);
+sendPush(title, body);
 lastNotifTime = now;
 lastSignals[key] = now;
 }
 }
-}).catch(function(e) { stats.errors++; });
+}).catch(function(err) { stats.errors++; });
 idx = (idx + 1) % PAIRS.length;
 if (idx === 0) stats.checks++;
 }
@@ -186,7 +178,7 @@ http.createServer(function(req, res) {
 res.writeHead(200);
 res.end(“ok”);
 }).listen(PORT, function() {
-console.log(“SERVER ON “ + PORT);
+console.log(“SERVER OK “ + PORT);
 sendPush(“Server Started”, “Running 24/7”).catch(function() {});
 setInterval(checkNext, 3000);
 });
